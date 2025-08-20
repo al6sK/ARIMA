@@ -33,7 +33,7 @@ train = data[(data.index.year >= start_year) & (data.index.year <= end_year)]
 train = train[['daily_ret_norm']]
 
 #___________________________________________
-# Test for stationarity of the udiff series
+# Test for stationarity of the train series
 #___________________________________________
 
 rolmean = train.rolling(10).mean()
@@ -55,13 +55,13 @@ for key, value in dftest[4].items():
 print(dfoutput)
 
 # Finding correlation 
-acf_values = acf(train.values, nlags=10)
+acf_values = acf(train.values, nlags=4)
 acf_values = acf_values[1:] # skip lag=0
 max_lag_acf = np.argmax(acf_values) + 1  
 print("max_lag_acf όπου εμφανίζεται:", max_lag_acf)
 
 # Finding partial autocorrelation
-pacf_values = pacf(train.values, nlags=10)
+pacf_values = pacf(train.values, nlags=4)
 pacf_values = pacf_values[1:]  # skip lag=0
 max_lag_pacf = np.argmax(pacf_values) + 1  
 
@@ -116,6 +116,7 @@ plt.grid(True)
 plt.tight_layout()
 plt.savefig('PLOTS/ARIMA_on_daily_ret/Forecast.png', dpi=300)
 
+
 next = pd.DataFrame({
     'daily_ret_norm': next.values
 }, index=next.index)
@@ -123,5 +124,5 @@ next = pd.DataFrame({
 df_forecast['Order'] =[1 if sig > 0 else -1 for sig in df_forecast['forecast'].diff()]
 next['Order'] =[1 if sig > 0 else -1 for sig in next['daily_ret_norm'].diff()]
 
-print(df_forecast.head(10))
-print(next.head(10))
+# print(df_forecast.head(10))
+# print(next.head(10))
