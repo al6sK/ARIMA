@@ -12,6 +12,13 @@ import warnings
 warnings.filterwarnings("ignore")
 
 #______________________________________
+# configuration
+#______________________________________
+start_year = 2022
+end_year = 2024
+window_size = 100
+
+#______________________________________
 # Load the dataset
 #______________________________________
 
@@ -57,27 +64,11 @@ def arima_forecast(window_size,current_data):
         #print(f"Processed {i+1}/{len(data)}: Actual={actual}, Forecast={forecast[0]}")
     predictions.index = pd.to_datetime(predictions.index) 
 
-    # plt.figure(figsize=(12,6))
-    # plt.plot(predictions['Forecast'], color='red', label='Predicted')
-    # plt.plot(predictions['Actual'],  color='green', label='Actual')
-
-    # plt.title('ARIMA Forecast vs Actual')
-    # plt.xlabel('Date')
-    # plt.ylabel('daily_ret_norm')
-    # plt.legend()
-    # plt.grid(alpha=0.3)
-    # plt.tight_layout()
-    # plt.savefig('PLOTS/ARIMA_trading/Forecast.png', dpi=300)
-    #plt.close()
-
-    #____________________________________________
-    # Calculate returns and strategy performance
-    #____________________________________________
+    # Calculate returns 
     initial_capital=100.0
-    # Ensure numeric
+    
     predictions[['Actual','Forecast']] = predictions[['Actual','Forecast']].astype(float)
 
-    # Signal και στρατηγική (shift για αποφυγή lookahead)
     predictions['Signal'] = (predictions['Forecast'] > 0).astype(int)
     predictions['Strategy_LogRet'] = predictions['Signal'].shift(1) * predictions['Actual']
     predictions['BuyHold_LogRet'] = predictions['Actual']
@@ -100,15 +91,13 @@ def arima_forecast(window_size,current_data):
     plt.savefig(f'PLOTS/ARIMA_trading/ARIMA_Strategy_vs_BuyAndHold.png', dpi=300)
     plt.close()
 
-    # Μικρό summary
+    # summary
     final_strategy = predictions['Wealth_Strategy'].iloc[-1]
     final_bh = predictions['Wealth_BuyHold'].iloc[-1]
     print(f"Final wealth ARIMA strategy={final_strategy:.2f} vs buy&hold={final_bh:.2f}, better? {final_strategy>final_bh}")
 
-#___________________________
-start_year = 2022
-end_year = 2024
-window_size = 100
+
+
 
 data = data[((data.index.year >= start_year) & (data.index.year <= end_year))]
 
