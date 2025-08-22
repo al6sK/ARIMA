@@ -95,9 +95,9 @@ def arima_forecast(window_size,current_data):
     plt.plot(predictions.index, predictions['Wealth_BuyHold'], label='Buy & Hold Wealth')
     plt.legend()
     plt.grid(True)
-    plt.title('Strategy vs Buy & Hold (Wealth)')
+    plt.title('ARIMA Strategy vs Buy & Hold (Wealth)')
     plt.tight_layout()
-    plt.savefig(f'PLOTS/ARIMA_trading/Strategy_vs_BuyAndHold.png', dpi=300)
+    plt.savefig(f'PLOTS/ARIMA_trading/ARIMA_Strategy_vs_BuyAndHold.png', dpi=300)
     plt.close()
 
     # Μικρό summary
