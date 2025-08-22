@@ -35,7 +35,6 @@ data = data[['Close']]
 data['daily_ret'] = data['Close'].diff()
 data['daily_ret_norm'] = np.log(data['Close']).diff()
 data = data.ffill()
-
 data.dropna(inplace=True)
 
 def arima_forecast(window_size,current_data):
