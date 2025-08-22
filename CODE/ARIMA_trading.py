@@ -106,8 +106,8 @@ def arima_forecast(window_size,current_data):
     print(f"Final wealth ARIMA strategy={final_strategy:.2f} vs buy&hold={final_bh:.2f}, better? {final_strategy>final_bh}")
 
 #___________________________
-start_year = 1929
-end_year = 1929
+start_year = 2022
+end_year = 2024
 window_size = 100
 
 data = data[((data.index.year >= start_year) & (data.index.year <= end_year))]
