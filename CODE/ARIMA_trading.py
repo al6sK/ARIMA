@@ -22,106 +22,97 @@ data.index = pd.to_datetime(data.index, utc=True)
 #______________________________________
 # Ready the data for ARIMA
 #______________________________________
-start_year = 2000
-end_year = 2000
-data = data[(data.index.year >= start_year) & (data.index.year <= end_year)]
+
 
 data = data[['Close']]
-data['daily_ret'] = data['Close'].pct_change()
+data['daily_ret'] = data['Close'].diff()
 data['daily_ret_norm'] = np.log(data['Close']).diff()
 data = data.ffill()
 
 data.dropna(inplace=True)
 
-window_size = 200
-train_window = data.iloc[:window_size][['daily_ret_norm']].copy()
+def arima_forecast(window_size,current_data):
+    train_window = current_data.iloc[:window_size][['daily_ret_norm']].copy()
+    predictions = pd.DataFrame(columns=['Actual', 'Forecast'])
+    for i in range(window_size, len(current_data)):
+        acf_values = acf(train_window.values, nlags=4)
+        acf_values = acf_values[1:] # skip lag=0
+        max_lag_acf = np.argmax(acf_values) + 1  
 
-predictions = pd.DataFrame(columns=['Actual', 'Forecast'])
+        pacf_values = pacf(train_window.values, nlags=4)
+        pacf_values = pacf_values[1:]  # skip lag=0
+        max_lag_pacf = np.argmax(pacf_values) + 1  
+        p = max_lag_acf
+        q = max_lag_pacf
 
+        model = ARIMA(train_window.values, order = (p, 0, q)).fit()
+        forecast = model.forecast(steps=1)
 
-for i in range(window_size, len(data)):
-    acf_values = acf(train_window.values, nlags=4)
-    acf_values = acf_values[1:] # skip lag=0
-    max_lag_acf = np.argmax(acf_values) + 1  
+        actual = current_data.iloc[i]['daily_ret_norm']
 
-    pacf_values = pacf(train_window.values, nlags=4)
-    pacf_values = pacf_values[1:]  # skip lag=0
-    max_lag_pacf = np.argmax(pacf_values) + 1  
-    p = max_lag_acf
-    q = max_lag_pacf
+        predictions.loc[current_data.index[i]] = [actual, forecast[0]]
 
-    model = ARIMA(train_window.values, order = (p, 0, q)).fit()
-    forecast = model.forecast(steps=1)
-
-    actual = data.iloc[i]['daily_ret_norm']
-
-    predictions.loc[data.index[i]] = [actual, forecast[0]]
-
-    train_window.loc[data.index[i]] = actual
-    if len(train_window) > window_size:
+        train_window.loc[current_data.index[i]] = actual
         train_window = train_window.iloc[1:]
-    print(f"Processed {i+1}/{len(data)}: Actual={actual}, Forecast={forecast[0]}")
+        #print(f"Processed {i+1}/{len(data)}: Actual={actual}, Forecast={forecast[0]}")
+    predictions.index = pd.to_datetime(predictions.index) 
+
+    # plt.figure(figsize=(12,6))
+    # plt.plot(predictions['Forecast'], color='red', label='Predicted')
+    # plt.plot(predictions['Actual'],  color='green', label='Actual')
+
+    # plt.title('ARIMA Forecast vs Actual')
+    # plt.xlabel('Date')
+    # plt.ylabel('daily_ret_norm')
+    # plt.legend()
+    # plt.grid(alpha=0.3)
+    # plt.tight_layout()
+    # plt.savefig('PLOTS/ARIMA_trading/Forecast.png', dpi=300)
+    #plt.close()
+
+    #____________________________________________
+    # Calculate returns and strategy performance
+    #____________________________________________
+    initial_capital=100.0
+    # Ensure numeric
+    predictions[['Actual','Forecast']] = predictions[['Actual','Forecast']].astype(float)
+
+    # Signal και στρατηγική (shift για αποφυγή lookahead)
+    predictions['Signal'] = (predictions['Forecast'] > 0).astype(int)
+    predictions['Strategy_LogRet'] = predictions['Signal'].shift(1) * predictions['Actual']
+    predictions['BuyHold_LogRet'] = predictions['Actual']
+
+    # From log-returns to wealth
+    predictions['CumLog_Strategy'] = predictions['Strategy_LogRet'].cumsum().fillna(0)
+    predictions['Wealth_Strategy'] = initial_capital * np.exp(predictions['CumLog_Strategy'])
+
+    predictions['CumLog_BuyHold'] = predictions['BuyHold_LogRet'].cumsum().fillna(0)
+    predictions['Wealth_BuyHold'] = initial_capital * np.exp(predictions['CumLog_BuyHold'])
+
+    # Plot wealth curves
+    plt.figure(figsize=(12,6))
+    plt.plot(predictions.index, predictions['Wealth_Strategy'], label='ARIMA Strategy Wealth')
+    plt.plot(predictions.index, predictions['Wealth_BuyHold'], label='Buy & Hold Wealth')
+    plt.legend()
+    plt.grid(True)
+    plt.title('Strategy vs Buy & Hold (Wealth)')
+    plt.tight_layout()
+    plt.savefig(f'PLOTS/ARIMA_trading/Strategy_vs_BuyAndHold.png', dpi=300)
+    plt.close()
+
+    # Μικρό summary
+    final_strategy = predictions['Wealth_Strategy'].iloc[-1]
+    final_bh = predictions['Wealth_BuyHold'].iloc[-1]
+    print(f"Final wealth ARIMA strategy={final_strategy:.2f} vs buy&hold={final_bh:.2f}, better? {final_strategy>final_bh}")
+
+#___________________________
+start_year = 1929
+end_year = 1929
+window_size = 100
+
+data = data[((data.index.year >= start_year) & (data.index.year <= end_year))]
+
+arima_forecast(window_size,data)
 
 
-predictions.index = pd.to_datetime(predictions.index)
 
-idx = pd.date_range(predictions.index.min(), predictions.index.max(), freq='B') 
-df_cont = predictions.reindex(idx)   
-
-df_cont = df_cont.ffill()   
-
-
-plt.figure(figsize=(12,6))
-plt.plot(predictions['Forecast'], color='red', label='Predicted')
-plt.plot(predictions['Actual'],  color='green', label='Actual')
-
-plt.title('ARIMA Forecast vs Actual')
-plt.xlabel('Date')
-plt.ylabel('daily_ret_norm')
-plt.legend()
-plt.grid(alpha=0.3)
-plt.tight_layout()
-plt.savefig('PLOTS/ARIMA_trading/Forecast.png', dpi=300)
-
-
-#____________________________________________
-# Calculate returns and strategy performance
-#____________________________________________
-
-initial_capital = 1  # Ή ό,τι κεφάλαιο θες
-
-# Δημιουργούμε τα σήματα
-predictions['Order'] = (predictions['Forecast'] > 0).astype(int)
-
-# Κέρδος ανά ημέρα με βάση το signal
-predictions['Profit'] = predictions['Order'] * data['daily_ret']
-
-# Κεφάλαιο με βάση ARIMA strategy
-predictions['ARIMA_Capital'] = initial_capital * (1 + predictions['Profit']).cumprod()
-
-# Κεφάλαιο Buy & Hold (επένδυση στην πρώτη μέρα και αφήνουμε να τρέξει)
-predictions['BuyAndHold'] = initial_capital * (1 + data['daily_ret']).cumprod()
-
-print("Final capital with ARIMA strategy:", predictions['ARIMA_Capital'].iloc[-1])
-print("Final capital with Buy & Hold:", predictions['BuyAndHold'].iloc[-1])
-
-predictions['Difference'] = predictions['ARIMA_Capital'] - predictions['BuyAndHold']
-
-
-plt.figure(figsize=(12,6))
-
-# Plot ARIMA vs Buy & Hold
-plt.plot(predictions.index, predictions['ARIMA_Capital'], label='ARIMA Strategy', color='blue')
-plt.plot(predictions.index, predictions['BuyAndHold'], label='Buy & Hold', color='green')
-
-# Plot Difference
-plt.plot(predictions.index, predictions['Difference'], label='Difference (ARIMA - Buy&Hold)', color='red', linestyle='--')
-
-plt.title("Capital Comparison: ARIMA vs Buy & Hold")
-plt.xlabel("Date")
-plt.ylabel("Capital (€)")
-plt.legend()
-plt.grid(alpha=0.3)
-plt.tight_layout()
-
-plt.savefig('PLOTS/ARIMA_trading/Strategy_vs_BuyAndHold.png', dpi=300)
